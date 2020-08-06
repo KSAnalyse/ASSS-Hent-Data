@@ -183,10 +183,49 @@ class SSBTable:
 class RegionKLASS:
     """ A class used to get classification list from SSB to keep track of which regions are valid within the last five years
 
-    This class is primarely used to get a list of regioncodes and their validity within the last five years.
+    This class is primarely used to get a list of region codes and their validity within the last five years.
+    It's used to get that list from various classification lists, append them all together, filter out equal ones 
+    and merge the ones who only has had a name change and not region code change.
+
+    Attributes:
+    -----------
+    klass_id : list
+        List of classificationcode we are using to get our complete list of region codes.
+
+    Methods:
+    --------
+    region_klass_url(i):
+        Concatenates klass_id with from date to max date from ssb to create the url
+    get_klass_variables():
+        Does a JSON get request for the classification ID provided and appends it to a list
+    filter_klass_variables():
+        Prunes the classification code region list to only include code, validfrom and validto dates.
+    filter_regions():
+        Filters equal codes, merges ones with name change and not region code change.
     """
 
     def __init__(self, klass_id):
+        """
+        Parameters:
+        -----------
+        klass_id : list
+            List of classificationcode we are using to get our complete list of region codes.
+        
+        Attributes:
+        -----------
+        klass_id : list
+            List of classificationcode we are using to get our complete list of region codes.
+        to_date : int
+            Current year
+        from_date : int
+            Current year subtracted by five, as we just get data for the past five years.
+        klass_variables : list
+            List of all the classifications
+        filtered_klass_variables : list
+            Pruned and filtered list of classifications
+        filtered_regions : dict
+            Filtered and merged regions. 
+        """
         self.klass_id = klass_id
         self.to_date = time.localtime(time.time()).tm_year
         self.from_date = self.to_date - 5
@@ -195,14 +234,36 @@ class RegionKLASS:
         self.filtered_regions = self.filter_regions()
 
     def region_klass_url(self, i):
+        """ Concatenates klass_id with from date to max date from ssb to create the url
+
+        Parameters:
+        -----------
+        i : str
+            str of the klass_id
+
+        Returns:
+        url : str
+            The concatenated url
+        """
         url = "http://data.ssb.no/api/klass/v1/classifications/" + i + "/codes?from=" + \
             str(self.from_date) + "-01-01&to=2059-01-01&includeFuture=true"
         return url
 
     def get_klass_variables(self):
+        """ Does a JSON get request for the classification ID provided and appends it to a list
+
+        Set a headers dict first, this is so that we get a JSON back. Standard return from SSB is XML.
+        Then we loop over the klass_id list and do a get request for each klass_id provided and append them to 
+        a list.
+
+        Returns:
+        --------
+        all_klass_data : list
+            Returns a list of all the classification codes.
+        """
         all_klass_data = []
+        headers = {"Accept": "application/json", "charset": "UTF-8"}
         for i in self.klass_id:
-            headers = {"Accept": "application/json", "charset": "UTF-8"}
             response = requests.get(self.region_klass_url(i), headers=headers)
             data = response.text
 
@@ -212,6 +273,17 @@ class RegionKLASS:
         return all_klass_data
 
     def filter_klass_variables(self):
+        """ Prunes the classification code region list to only include code, validfrom and validto dates.
+
+        Runs through the klass_variables list and loads them as a JSON object. It then runs through the 
+        JSON object and prunes away everything we don't need so that we only have region code, validfrom and validto.
+        This might be an unnecessary step, but it doesn't take much time and is done only once per table.
+
+        Returns:
+        --------
+        regioner : list
+            A list of all the region codes and their valid from/to date.
+        """
         regioner = []
         for klass_id in self.klass_variables:
             json_array = json.loads(klass_id)["codes"]
@@ -230,6 +302,16 @@ class RegionKLASS:
         return regioner
 
     def filter_regions(self):
+        """ Filters equal codes, merges ones with name change and not region code change.
+
+        In this method we go through the filtered_klass_variables and merge regions that has only changed name, 
+        we also filter out regions that are equal.
+
+        Returns:
+        --------
+        filtered_regions_klass : dict
+            A complete list of all region codes we use.
+        """
         filtered_regions_klass = {}
         for regions in self.filtered_klass_variables:
             try:
@@ -245,6 +327,16 @@ class RegionKLASS:
         return filtered_regions_klass
 
 def build_query(variables, _filter="item"):
+    """ A function to build a standard query for the SSB API.
+
+    We set up a standard query as a dict and an empty query list.
+    Then it loops over the variables parameter, which is a list of the metadata
+    that has been filtered for the regions that are invalid within the last five years.
+    It ignores the other values, except for the code, filter and values from the metadata 
+    as SSB doesn't use those when querying.
+    At the end it appends it query key in the query dict and returns the query dict.
+
+    """
     query = {
         "query": [],
         "response": {
@@ -264,17 +356,14 @@ def build_query(variables, _filter="item"):
         query_details["code"] = var["code"]
         if (_filter != "item"):
             query_details["selection"]["filter"] = _filter
-        if "omfang" in var["text"]:
-            query_details["selection"]["values"] = ["A"]
-        else:
-            query_details["selection"]["values"].extend(var["values"])
+        query_details["selection"]["values"].extend(var["values"])
         query["query"].append(query_details)
     return query
 
 def meta_filter():
     metadata_filter = []
     
-    for year in ssb_table.variables["variables"][ssb_table.table_tid]["values"]:
+    for year in ssb_table.variables["variables"][ssb_table.table_tid]["values"][-1:-6:-1]:
         new_meta_var = copy.deepcopy(ssb_table.variables["variables"])
         new_meta_regions = []
         for region in ssb_table.variables["variables"][ssb_table.table_region]["values"]:
@@ -303,19 +392,17 @@ def meta_filter():
 def post_query():
     dataframes = []
     meta_data = meta_filter()
-    #result_list =[]
 
     for variables in meta_data:
         query = build_query(variables)
         data = requests.post(ssb_table.metadata_url, json=query)
-        #result_list.append(data)
-        #print(data)
         time.sleep(2.0)
         results = pyjstat.from_json_stat(data.json(object_pairs_hook=OrderedDict), naming="id")
         dataframes.append(results[0])
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
     
-ssb_table = SSBTable(TabellNummer, Filter)
+ssb_table = SSBTable("12367", "KOKregnskapsomfa0000=A")
 klass = RegionKLASS(["131", "104", "214", "231"])
 r = post_query()
+print(r)
