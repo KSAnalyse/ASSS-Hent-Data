@@ -334,7 +334,19 @@ def build_query(variables, _filter="item"):
     that has been filtered for the regions that are invalid within the last five years.
     It ignores the other values, except for the code, filter and values from the metadata 
     as SSB doesn't use those when querying.
-    At the end it appends it query key in the query dict and returns the query dict.
+    At the end it appends it query list in the main query dict and returns it.
+
+    Parameters:
+    -----------
+    variables : list
+        Filtered list that has been pruned for regions that are not valid
+    _filter : str
+        A string parameter for the query filter variable
+
+    Returns:
+    --------
+    query : dict
+        Returns a query for a single year or one that equals 800k rows.
 
     """
     query = {
@@ -361,6 +373,22 @@ def build_query(variables, _filter="item"):
     return query
 
 def meta_filter():
+    """ A function that filters away the regions that are invalid for the past five years.
+
+    We run a double for loop, where the first one iterates on year and the second one goes through regions.
+    It's done this way becaue of the way JSON-Stat files are built up, if we don't do a filter and query for each year 
+    separately we will end up getting values for regions that are invalid for that year (In SSB's case they 
+    are returned as the number 0). For each region we check it against our classification list to check if the 
+    region code we are on is valid for the current year we are iterating over. If not, it excludes it from the filter. 
+    We also constantly check if the next region added is going to make us surpass 800k rows on a query, is so, it appends 
+    the current list to metadata_filter and starts building up a new list from where it left off. If it never reaches 800k 
+    per year, it will append the list to metadata_filter when the region loop is done.
+
+    Returns:
+    --------
+    metadata_filter : list
+        A list of the metadata_variables that has been filtered for non valid regions for the past five years. 
+    """
     metadata_filter = []
     
     for year in ssb_table.variables["variables"][ssb_table.table_tid]["values"][-1:-6:-1]:
@@ -381,8 +409,7 @@ def meta_filter():
                         metadata_filter.append(new_meta_var)
                         new_meta_regions = []
                         new_meta_regions.append(region)
-                        new_meta_var = copy.deepcopy(
-                            ssb_table.variables["variables"])
+                        new_meta_var = copy.deepcopy(ssb_table.variables["variables"])
         new_meta_var[ssb_table.table_region]["values"] = new_meta_regions
         new_meta_var[ssb_table.table_tid]["values"] = [year]
         metadata_filter.append(new_meta_var)
@@ -390,19 +417,34 @@ def meta_filter():
     return metadata_filter
 
 def post_query():
+    """ A function to do a post query on the SSB API.
+
+    This function does a post query on the SSB API, following the SSB API Documentation, by 
+    doing a post request with the query we have built up, we get a JSON stat file back with the result.
+    First we run meta_filter() once to get the filtered metadata variables, then for each dict in the list 
+    we run the build_query() function and post that query to the SSB API. Which after running that query 
+    returns a JSON-Stat file back with the results. We then run that JSON-Stat through pyjstat which converts 
+    and structures that file to a pandas DataFrame which gets appended to dataframes list. Once the for loop 
+    has finished we run a pandas concat on the dataframes list to convert to one single DF.
+
+    Returns:
+    --------
+    big_df : Series
+        This is the DataFrame that will be returned to the SQL server we are using.
+    """
+
     dataframes = []
     meta_data = meta_filter()
 
     for variables in meta_data:
         query = build_query(variables)
         data = requests.post(ssb_table.metadata_url, json=query)
-        time.sleep(2.0)
+        time.sleep(5.0)
         results = pyjstat.from_json_stat(data.json(object_pairs_hook=OrderedDict), naming="id")
         dataframes.append(results[0])
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
-    
+
 ssb_table = SSBTable("12367", "KOKregnskapsomfa0000=A")
 klass = RegionKLASS(["131", "104", "214", "231"])
 r = post_query()
-print(r)
