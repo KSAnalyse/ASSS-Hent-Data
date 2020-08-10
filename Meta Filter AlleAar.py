@@ -125,11 +125,15 @@ class SSBTable:
             if var["code"] in filter_dict:
                 value_texts = []
                 for value in filter_dict[var["code"]]:
-                    index_of_value = json_metadata["variables"][idx]["values"].index(
-                        value)
-                    value_texts.append(
-                        json_metadata["variables"][idx]["valueTexts"][index_of_value])
-
+                    try:
+                        print
+                        index_of_value = json_metadata["variables"][idx]["values"].index(
+                            value)
+                        value_texts.append(
+                            json_metadata["variables"][idx]["valueTexts"][index_of_value])
+                    except ValueError:
+                        filter_dict[var["code"]].remove(value)
+                        print(value, "finnes ikke i metadata, har blitt fjernet fra spørringen.")
                 json_metadata["variables"][idx]["values"] = filter_dict[var["code"]]
                 json_metadata["variables"][idx]["valueTexts"] = value_texts
         return json_metadata
@@ -439,12 +443,14 @@ def post_query():
     for variables in meta_data:
         query = build_query(variables)
         data = requests.post(ssb_table.metadata_url, json=query)
+        if data.status_code != 200:
+             print("yes")
         time.sleep(5.0)
         results = pyjstat.from_json_stat(data.json(object_pairs_hook=OrderedDict), naming="id")
         dataframes.append(results[0])
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
 
-ssb_table = SSBTable("12367", "KOKregnskapsomfa0000=A")
+ssb_table = SSBTable("11820", "Tid=2014,2018")
 klass = RegionKLASS(["131", "104", "214", "231"])
 r = post_query()
