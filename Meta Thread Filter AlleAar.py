@@ -299,7 +299,7 @@ def post_query():
         query = build_query(variables)
         data = requests.post(ssb_table.metadata_url, json=query)
         result_list.append(data)
-        time.sleep(2.0)
+        time.sleep(5.0)
         print(data)
     print("FOR LOOP: ", time.time() - timer_for)
     return result_list
@@ -313,7 +313,7 @@ def master():
     timer2 = time.time()
     x = post_query()
     timer = time.time()
-    pool = multiprocessing.Pool(processes=0)
+    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
     print("1")
     dataframes = pool.map(run_pyjstat, x)
     print("2")
