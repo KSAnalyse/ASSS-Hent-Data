@@ -105,7 +105,6 @@ class SSBTable:
             filtered_variables = ssb_table_metadata
         return filtered_variables
 
-
     def filter_json_metadata(self, json_metadata, filter_dict):
         """Filters out metadata that isn't in the filter string.
 
@@ -126,7 +125,6 @@ class SSBTable:
                 value_texts = []
                 for value in filter_dict[var["code"]]:
                     try:
-                        print
                         index_of_value = json_metadata["variables"][idx]["values"].index(
                             value)
                         value_texts.append(
@@ -444,13 +442,13 @@ def post_query():
         query = build_query(variables)
         data = requests.post(ssb_table.metadata_url, json=query)
         if data.status_code != 200:
-             print("yes")
+             print("Feil! Status kode:", data.status_code)
         time.sleep(5.0)
         results = pyjstat.from_json_stat(data.json(object_pairs_hook=OrderedDict), naming="id")
         dataframes.append(results[0])
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
 
-ssb_table = SSBTable("11820", "Tid=2014,2018")
+ssb_table = SSBTable(TabellNummer, Filter)
 klass = RegionKLASS(["131", "104", "214", "231"])
 r = post_query()
