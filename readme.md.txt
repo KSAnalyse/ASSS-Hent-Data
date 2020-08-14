@@ -1,1 +1,0 @@
-Bare noen forskjellige løsninger vi har testet ut når det gjelder å gjøre spørringer mot SSB sitt API og sortere ut ugyldige regioner for de årene vi gjør spørringer for. 
