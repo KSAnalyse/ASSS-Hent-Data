@@ -64,7 +64,7 @@ class SSBTable:
         self.table_id = table_id
         self.metadata_filter = metadata_filter
         self.variables = self.metadata_variables(metadata_filter)
-        self.table_region, self.table_tid, self.table_size = self.find_table_dimensions
+        self.table_region, self.table_tid, self.table_size, self.table_total_size = self.find_table_dimensions
         self.ssb_max_row_query = 800000
 
     @property
@@ -170,17 +170,19 @@ class SSBTable:
         table_size : int
             Row size of the dimensions, except for Region and Tid.
         """
-        table_region = 0
-        table_tid = 0
+        table_region = None
+        table_tid = None
         table_size = 1
+        table_total_size = 1
         for v_idx, var in enumerate(self.variables["variables"]):
+            table_total_size *= len(var["values"])
             if var["text"] == "region":
                 table_region = v_idx
             elif var["code"] == "Tid":
-                table_tid = v_idx            
+                table_tid = v_idx
             else:
                 table_size *= len(var["values"])
-        return table_region, table_tid, table_size
+        return table_region, table_tid, table_size, table_total_size
 
 class RegionKLASS:
     """ A class used to get classification list from SSB to keep track of which regions are valid within the last five years
@@ -366,7 +368,7 @@ def build_query(variables, _filter="item"):
                 "values": []
             }
         }
-
+        print(query_details["code"], var["code"])
         query_details["code"] = var["code"]
         if (_filter != "item"):
             query_details["selection"]["filter"] = _filter
@@ -393,28 +395,35 @@ def meta_filter():
     """
     metadata_filter = []
     
-    for year in ssb_table.variables["variables"][ssb_table.table_tid]["values"][-1:-6:-1]:
-        new_meta_var = copy.deepcopy(ssb_table.variables["variables"])
-        new_meta_regions = []
-        for region in ssb_table.variables["variables"][ssb_table.table_region]["values"]:
-            if region in {"0", "EAK", "EAKUO"}:
-                new_meta_regions.append(region)
-            elif region in klass.filtered_regions.keys():
-                valid_from = int(klass.filtered_regions[region]["validFrom"])
-                valid_to = int(klass.filtered_regions[region]["validTo"])
-                if int(year) in range(valid_from, valid_to):
-                    if (ssb_table.table_size * (len(new_meta_regions) + 1)) < ssb_table.ssb_max_row_query:
-                        new_meta_regions.append(region)
-                    else:
-                        new_meta_var[ssb_table.table_region]["values"] = new_meta_regions
-                        new_meta_var[ssb_table.table_tid]["values"] = [year]
-                        metadata_filter.append(new_meta_var)
-                        new_meta_regions = []
-                        new_meta_regions.append(region)
-                        new_meta_var = copy.deepcopy(ssb_table.variables["variables"])
-        new_meta_var[ssb_table.table_region]["values"] = new_meta_regions
-        new_meta_var[ssb_table.table_tid]["values"] = [year]
-        metadata_filter.append(new_meta_var)
+    if ssb_table.table_region != None:
+        for year in ssb_table.variables["variables"][ssb_table.table_tid]["values"][-1:-6:-1]:
+            new_meta_var = copy.deepcopy(ssb_table.variables["variables"])
+            new_meta_regions = []
+            for region in ssb_table.variables["variables"][ssb_table.table_region]["values"]:
+                if region in {"0", "EAK", "EAKUO"}:
+                    new_meta_regions.append(region)
+                elif region in klass.filtered_regions.keys():
+                    valid_from = int(klass.filtered_regions[region]["validFrom"])
+                    valid_to = int(klass.filtered_regions[region]["validTo"])
+                    if int(year) in range(valid_from, valid_to):
+                        if (ssb_table.table_size * (len(new_meta_regions) + 1)) < ssb_table.ssb_max_row_query:
+                            new_meta_regions.append(region)
+                        else:
+                            new_meta_var[ssb_table.table_region]["values"] = new_meta_regions
+                            new_meta_var[ssb_table.table_tid]["values"] = [year]
+                            metadata_filter.append(new_meta_var)
+                            new_meta_regions = []
+                            new_meta_regions.append(region)
+                            new_meta_var = copy.deepcopy(ssb_table.variables["variables"])
+            new_meta_var[ssb_table.table_region]["values"] = new_meta_regions
+            new_meta_var[ssb_table.table_tid]["values"] = [year]
+            metadata_filter.append(new_meta_var)
+    else:
+        if ssb_table.table_total_size < ssb_table.ssb_max_row_query:
+            metadata_filter.append(ssb_table.variables["variables"])            
+        else:
+            print("yikes")
+
 
     return metadata_filter
 
@@ -449,6 +458,7 @@ def post_query():
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
 
-ssb_table = SSBTable(TabellNummer, Filter)
+ssb_table = SSBTable("05307", "Tid=2018,2019")
 klass = RegionKLASS(["131", "104", "214", "231"])
 r = post_query()
+print(r)
