@@ -368,7 +368,6 @@ def build_query(variables, _filter="item"):
                 "values": []
             }
         }
-        print(query_details["code"], var["code"])
         query_details["code"] = var["code"]
         if (_filter != "item"):
             query_details["selection"]["filter"] = _filter
@@ -420,10 +419,7 @@ def meta_filter():
             metadata_filter.append(new_meta_var)
     else:
         if ssb_table.table_total_size < ssb_table.ssb_max_row_query:
-            metadata_filter.append(ssb_table.variables["variables"])            
-        else:
-            print("yikes")
-
+            metadata_filter.append(ssb_table.variables["variables"])
 
     return metadata_filter
 
@@ -461,4 +457,3 @@ def post_query():
 ssb_table = SSBTable("05307", "Tid=2018,2019")
 klass = RegionKLASS(["131", "104", "214", "231"])
 r = post_query()
-print(r)
