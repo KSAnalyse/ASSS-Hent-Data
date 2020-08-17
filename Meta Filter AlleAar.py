@@ -17,10 +17,10 @@ class SSBTable:
     Attributes:
     -----------
     table_id : str
-        Table number that's used to query against correct ssb table.
+        Table number thats used to query against correct ssb table.
     metadata_filter : list
-        A list that's set to None by default, unless a filter has been passed along. 
-        This filter defines what data we will query with, if it's empty we will query for everything.
+        A list thats set to None by default, unless a filter has been passed along. 
+        This filter defines what data we will query with, if its empty we will query for everything.
 
     Methods:
     --------
@@ -43,10 +43,10 @@ class SSBTable:
         Parameters:
         -----------
         table_id : str
-            Table number that's used to query against correct ssb table.
+            Table number thats used to query against correct ssb table.
         metadata_filter : list/None
-            A list that's set to None by default, unless a filter has been passed along. 
-            This filter defines what data we will query with, if it's empty we will query for everything.
+            A list thats set to None by default, unless a filter has been passed along. 
+            This filter defines what data we will query with, if its empty we will query for everything.
         
         Attributes:
         -----------
@@ -106,7 +106,7 @@ class SSBTable:
         return filtered_variables
 
     def filter_json_metadata(self, json_metadata, filter_dict):
-        """Filters out metadata that isn't in the filter string.
+        """Filters out metadata that isnt in the filter string.
 
         Parameters:
         -----------
@@ -188,7 +188,7 @@ class RegionKLASS:
     """ A class used to get classification list from SSB to keep track of which regions are valid within the last five years
 
     This class is primarely used to get a list of region codes and their validity within the last five years.
-    It's used to get that list from various classification lists, append them all together, filter out equal ones 
+    Its used to get that list from various classification lists, append them all together, filter out equal ones 
     and merge the ones who only has had a name change and not region code change.
 
     Attributes:
@@ -280,8 +280,8 @@ class RegionKLASS:
         """ Prunes the classification code region list to only include code, validfrom and validto dates.
 
         Runs through the klass_variables list and loads them as a JSON object. It then runs through the 
-        JSON object and prunes away everything we don't need so that we only have region code, validfrom and validto.
-        This might be an unnecessary step, but it doesn't take much time and is done only once per table.
+        JSON object and prunes away everything we dont need so that we only have region code, validfrom and validto.
+        This might be an unnecessary step, but it doesnt take much time and is done only once per table.
 
         Returns:
         --------
@@ -337,7 +337,7 @@ def build_query(variables, _filter="item"):
     Then it loops over the variables parameter, which is a list of the metadata
     that has been filtered for the regions that are invalid within the last five years.
     It ignores the other values, except for the code, filter and values from the metadata 
-    as SSB doesn't use those when querying.
+    as SSB doesnt use those when querying.
     At the end it appends it query list in the main query dict and returns it.
 
     Parameters:
@@ -379,8 +379,8 @@ def meta_filter():
     """ A function that filters away the regions that are invalid for the past five years.
 
     We run a double for loop, where the first one iterates on year and the second one goes through regions.
-    It's done this way becaue of the way JSON-Stat files are built up, if we don't do a filter and query for each year 
-    separately we will end up getting values for regions that are invalid for that year (In SSB's case they 
+    Its done this way becaue of the way JSON-Stat files are built up, if we dont do a filter and query for each year 
+    separately we will end up getting values for regions that are invalid for that year (In SSBs case they 
     are returned as the number 0). For each region we check it against our classification list to check if the 
     region code we are on is valid for the current year we are iterating over. If not, it excludes it from the filter. 
     We also constantly check if the next region added is going to make us surpass 800k rows on a query, is so, it appends 
@@ -454,6 +454,6 @@ def post_query():
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
 
-ssb_table = SSBTable("05307", "Tid=2018,2019")
+ssb_table = SSBTable(TabellNummer, Filter)
 klass = RegionKLASS(["131", "104", "214", "231"])
 r = post_query()
