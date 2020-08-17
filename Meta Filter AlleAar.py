@@ -442,18 +442,19 @@ def post_query():
 
     dataframes = []
     meta_data = meta_filter()
+    print(len(meta_data))
 
     for variables in meta_data:
         query = build_query(variables)
         data = requests.post(ssb_table.metadata_url, json=query)
         if data.status_code != 200:
-             print("Feil! Status kode:", data.status_code)
+            print("Feil! Status kode:", data.status_code)
         time.sleep(5.0)
         results = pyjstat.from_json_stat(data.json(object_pairs_hook=OrderedDict), naming="id")
         dataframes.append(results[0])
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
 
-ssb_table = SSBTable(TabellNummer, Filter)
+ssb_table = SSBTable("07459", "Tid=2016,2017,2018,2019,2020")
 klass = RegionKLASS(["131", "104", "214", "231"])
 r = post_query()
