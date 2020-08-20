@@ -323,7 +323,7 @@ class RegionKLASS:
                 if regions["validFrom"] < filtered_regions_klass[regions["code"]]["validFrom"]:
                     filtered_regions_klass[regions["code"]
                                            ]["validFrom"] = regions["validFrom"]
-                else:
+                elif regions["validTo"] > filtered_regions_klass[regions["code"]]["validTo"]:
                     filtered_regions_klass[regions["code"]
                                            ]["validTo"] = regions["validTo"]
             except KeyError:
@@ -442,7 +442,6 @@ def post_query():
 
     dataframes = []
     meta_data = meta_filter()
-    print(len(meta_data))
 
     for variables in meta_data:
         query = build_query(variables)
@@ -455,6 +454,6 @@ def post_query():
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
 
-ssb_table = SSBTable("07459", "Tid=2016,2017,2018,2019,2020")
+ssb_table = SSBTable(TabellNummer, Filter)
 klass = RegionKLASS(["131", "104", "214", "231"])
 r = post_query()
