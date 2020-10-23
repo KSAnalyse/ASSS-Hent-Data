@@ -63,7 +63,8 @@ class SSBTable:
         """
         self.table_id = table_id
         self.metadata_filter = metadata_filter
-        self.variables = self.metadata_variables(metadata_filter)
+        self.exclusion_variables, self.inclusion_variables = self.filters_as_dict(self.metadata_filter)
+        self.variables = self.metadata_variables(self.inclusion_variables, self.exclusion_variables)
         self.table_region, self.table_tid, self.table_size, self.table_total_size = self.find_table_dimensions
         self.ssb_max_row_query = 800000
 
@@ -79,7 +80,7 @@ class SSBTable:
         url = "http://data.ssb.no/api/v0/no/table/" + self.table_id
         return url
 
-    def metadata_variables(self, metadata_filter):
+    def metadata_variables(self, inclusion_variables, exclusion_variables):
         """ JSON request for the metadata.
 
         Does a JSON get request for the metadata for the table we will query.
@@ -98,22 +99,23 @@ class SSBTable:
         """
         filtered_variables = []
         ssb_table_metadata = requests.get(self.metadata_url).json()
-        if (metadata_filter != None):
-            filtered_variables = self.filter_json_metadata(
-                ssb_table_metadata, self.filters_as_dict(self.metadata_filter))
+        if (inclusion_variables != None) or exclusion_variables != None:
+            filtered_variables = self.filter_json_metadata(ssb_table_metadata, self.inclusion_variables, self.exclusion_variables)
         else:
             filtered_variables = ssb_table_metadata
         return filtered_variables
 
-    def filter_json_metadata(self, json_metadata, filter_dict):
+    def filter_json_metadata(self, json_metadata, filter_dict_inc, filter_dict_exc):
         """Filters out metadata that isnt in the filter string.
 
         Parameters:
         -----------
         json_metadata : list
             A complete list of the tables metadata, except for what had been filtered out by filter_json_metadata.
-        filter_dict : dict
-            A dict of the filter string provided by filters_as_dict
+        filter_dict_inc : dict
+            A dict of the filter string provided by filters_as_dict to include
+        filter_dict_exc : dict
+            A dict of the filter string provided by filters_as_dict to exclude
         
         Returns:
         --------
@@ -121,19 +123,30 @@ class SSBTable:
             Returns a filtered dict of the metadata.
         """
         for idx, var in enumerate(json_metadata["variables"]):
-            if var["code"] in filter_dict:
+            if var["code"] in filter_dict_inc:
                 value_texts = []
-                for value in filter_dict[var["code"]]:
-                    try:
-                        index_of_value = json_metadata["variables"][idx]["values"].index(
-                            value)
-                        value_texts.append(
-                            json_metadata["variables"][idx]["valueTexts"][index_of_value])
-                    except ValueError:
-                        filter_dict[var["code"]].remove(value)
-                        print(value, "finnes ikke i metadata, har blitt fjernet fra spørringen.")
-                json_metadata["variables"][idx]["values"] = filter_dict[var["code"]]
+                for value in filter_dict_inc[var["code"]]:
+                    if value == "None":
+                        filter_dict_inc[var["code"]].remove(value)
+                    else:
+                        try:
+                            index_of_value = json_metadata["variables"][idx]["values"].index(
+                                value)
+                            value_texts.append(
+                                json_metadata["variables"][idx]["valueTexts"][index_of_value])
+                        except ValueError:
+                            filter_dict_inc[var["code"]].remove(value)
+                            print(value, "finnes ikke i metadata, har blitt fjernet fra spørringen.")
+                json_metadata["variables"][idx]["values"] = filter_dict_inc[var["code"]]
                 json_metadata["variables"][idx]["valueTexts"] = value_texts
+        
+        for idx, var in enumerate(json_metadata["variables"]):
+            if var["code"] in filter_dict_exc:
+                for value in filter_dict_exc[var["code"]]:
+                    print(value)
+                    json_metadata["variables"][idx]["values"].remove(value)
+                
+        print(json_metadata)
         return json_metadata
 
     def filters_as_dict(self, filter_string):
@@ -149,13 +162,47 @@ class SSBTable:
         filters : dict
             Returns a dict of the filter string.
         """
-        filters = {}
-        filter_args = re.split("[=&]", filter_string)
-        for idx, meta_filter in enumerate(filter_args):
-            if ((idx % 2) == 0):
-                filters[meta_filter] = filter_args[filter_args.index(
-                    meta_filter) + 1].split(",")
-        return filters
+        filter_args_exc_split = []
+        filter_args_inc_split = []
+        filter_split = re.split("&", filter_string)
+        print(filter_split)
+        for var in filter_split:
+            if re.search(r"\w+!=\w+", var):
+                filter_args_exc_split.append(var)
+            if re.search(r"\w+=\w+", var):
+                filter_args_inc_split.append(var)
+
+        
+        filter_args_exc = []
+        for var in filter_args_exc_split:
+            split = re.split(r"!=", var)
+            filter_args_exc.extend(split)
+
+        filter_args_inc = []
+        for var in filter_args_inc_split:
+            split = re.split(r"=", var)
+            filter_args_inc.extend(split)
+
+        
+        filters_inc = {}
+        filters_exc = {}
+        
+
+        if filter_args_exc:
+            for idx, meta_filter in enumerate(filter_args_exc):
+                if ((idx % 2) == 0):
+                    filters_exc[meta_filter] = filter_args_exc[filter_args_exc.index(
+                        meta_filter) + 1].split(",")
+        if filter_args_inc:
+            for idx, meta_filter in enumerate(filter_args_inc):
+                if ((idx % 2) == 0):
+                    filters_inc[meta_filter] = filter_args_inc[filter_args_inc.index(
+                        meta_filter) + 1].split(",")
+
+        print("EXCLUDE", filters_exc)
+        print("INCLUDE", filters_inc)
+
+        return filters_exc, filters_inc
 
     @property
     def find_table_dimensions(self):
@@ -448,12 +495,13 @@ def post_query():
         data = requests.post(ssb_table.metadata_url, json=query)
         if data.status_code != 200:
             print("Feil! Status kode:", data.status_code)
-        time.sleep(5.0)
+        time.sleep(3.0)
         results = pyjstat.from_json_stat(data.json(object_pairs_hook=OrderedDict), naming="id")
         dataframes.append(results[0])
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
 
-ssb_table = SSBTable(TabellNummer, Filter)
+ssb_table = SSBTable("11971", "KOKkommuneregion0000=EAK,EAKUO,0101&ContentsCode!=KOSelevpergrskol0000&Tid!=2018,2019")
 klass = RegionKLASS(["131", "104", "214", "231"])
 r = post_query()
+print(r)
