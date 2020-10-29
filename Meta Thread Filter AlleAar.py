@@ -314,10 +314,7 @@ def master():
     x = post_query()
     timer = time.time()
     pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    print("1")
     dataframes = pool.map(run_pyjstat, x)
-    print("2")
-    print("3")
     pool.close()
     pool.join()
     print("THREADS: ", time.time() - timer)
@@ -327,7 +324,7 @@ def master():
         
 
 if __name__ == "__main__":
-    ssb_table = SSBTable("11820")
+    ssb_table = SSBTable("12367")
     klass = RegionKLASS(["131", "104", "214", "231"])
     r = master()
     print(r)

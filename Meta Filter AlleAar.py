@@ -63,7 +63,10 @@ class SSBTable:
         """
         self.table_id = table_id
         self.metadata_filter = metadata_filter
-        self.exclusion_variables, self.inclusion_variables = self.filters_as_dict(self.metadata_filter)
+        self.exclusion_variables = None
+        self.inclusion_variables = None
+        if metadata_filter != None:
+            self.exclusion_variables, self.inclusion_variables = self.filters_as_dict(self.metadata_filter)
         self.variables = self.metadata_variables(self.inclusion_variables, self.exclusion_variables)
         self.table_region, self.table_tid, self.table_size, self.table_total_size = self.find_table_dimensions
         self.ssb_max_row_query = 800000
@@ -99,7 +102,7 @@ class SSBTable:
         """
         filtered_variables = []
         ssb_table_metadata = requests.get(self.metadata_url).json()
-        if (inclusion_variables != None) or exclusion_variables != None:
+        if (inclusion_variables != None) or (exclusion_variables != None):
             filtered_variables = self.filter_json_metadata(ssb_table_metadata, self.inclusion_variables, self.exclusion_variables)
         else:
             filtered_variables = ssb_table_metadata
@@ -143,10 +146,8 @@ class SSBTable:
         for idx, var in enumerate(json_metadata["variables"]):
             if var["code"] in filter_dict_exc:
                 for value in filter_dict_exc[var["code"]]:
-                    print(value)
                     json_metadata["variables"][idx]["values"].remove(value)
                 
-        print(json_metadata)
         return json_metadata
 
     def filters_as_dict(self, filter_string):
@@ -165,7 +166,6 @@ class SSBTable:
         filter_args_exc_split = []
         filter_args_inc_split = []
         filter_split = re.split("&", filter_string)
-        print(filter_split)
         for var in filter_split:
             if re.search(r"\w+!=\w+", var):
                 filter_args_exc_split.append(var)
@@ -198,9 +198,6 @@ class SSBTable:
                 if ((idx % 2) == 0):
                     filters_inc[meta_filter] = filter_args_inc[filter_args_inc.index(
                         meta_filter) + 1].split(",")
-
-        print("EXCLUDE", filters_exc)
-        print("INCLUDE", filters_inc)
 
         return filters_exc, filters_inc
 
@@ -501,7 +498,6 @@ def post_query():
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
 
-ssb_table = SSBTable("11971", "KOKkommuneregion0000=EAK,EAKUO,0101&ContentsCode!=KOSelevpergrskol0000&Tid!=2018,2019")
+ssb_table = SSBTable(TabellNummer, Filter)
 klass = RegionKLASS(["131", "104", "214", "231"])
 r = post_query()
-print(r)
