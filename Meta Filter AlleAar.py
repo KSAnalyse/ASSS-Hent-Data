@@ -68,7 +68,7 @@ class SSBTable:
         if metadata_filter != None:
             self.exclusion_variables, self.inclusion_variables = self.filters_as_dict(self.metadata_filter)
         self.variables = self.metadata_variables(self.inclusion_variables, self.exclusion_variables)
-        self.table_region, self.table_tid, self.table_size, self.table_total_size = self.find_table_dimensions
+        self.table_region, self.table_tid_name, self.table_tid, self.table_size, self.table_total_size = self.find_table_dimensions
         self.ssb_max_row_query = 800000
 
     @property
@@ -216,6 +216,7 @@ class SSBTable:
         """
         table_region = None
         table_tid = None
+        table_tid_name = None
         table_size = 1
         table_total_size = 1
         for v_idx, var in enumerate(self.variables["variables"]):
@@ -223,20 +224,19 @@ class SSBTable:
             if var["text"] == "region":
                 table_region = v_idx
             elif var["text"] == "måned":
+                table_tid_name = "måned"
                 table_tid = v_idx
-                print("måned", v_idx)
             elif var["text"] == "kvartal":
+                table_tid_name = "kvartal"
                 table_tid = v_idx
-                print("kvartal", v_idx)
             elif var["text"] == "år":
+                table_tid_name = "år"
                 table_tid = v_idx
-                print("år", v_idx)
             elif var["code"] == "Tid":
-                table_tid = v_idx
-                print("år2", v_idx)
+                raise Exception("Tid er noe annet enn år, kvartal eller måned. Verdien på navnet er x.".format(var["text"]))
             else:
                 table_size *= len(var["values"])
-        return table_region, table_tid, table_size, table_total_size
+        return table_region, table_tid_name, table_tid, table_size, table_total_size
 
 class RegionKLASS:
     """ A class used to get classification list from SSB to keep track of which regions are valid within the last five years
@@ -287,13 +287,10 @@ class RegionKLASS:
         tid = ""
         max_tid = max(tid_list)[0:4]
         min_tid = min(tid_list)[0:4]
-        print(max_tid, min_tid)
         if int(max_tid) - 5 < int(min_tid):
             tid = int(min_tid)
-            print("yes")
         else:
             tid = int(max_tid) - 5
-            print("no")
         self.klass_id = klass_id
         self.from_date = tid
         self.klass_variables = self.get_klass_variables()
@@ -438,7 +435,18 @@ def build_query(variables, _filter="item"):
         query["query"].append(query_details)
     return query
 
-def meta_filter():
+def calc_iterations():
+    iterations = 0
+    if ssb_table.table_tid_name == "år":
+        iterations = -6
+    elif ssb_table.table_tid_name == "måned":
+        iterations = -61
+    elif ssb_table.table_tid_name == "kvartal":
+        iterations = -21
+    
+    return iterations
+
+def meta_filter(iterations):
     """ A function that filters away the regions that are invalid for the past five years.
 
     We run a double for loop, where the first one iterates on year and the second one goes through regions.
@@ -456,12 +464,8 @@ def meta_filter():
         A list of the metadata_variables that has been filtered for non valid regions for the past five years. 
     """
     metadata_filter = []
-    print(ssb_table.table_region)
     if ssb_table.table_region != None:
-        print("Ikke NONE")
-        for year in ssb_table.variables["variables"][ssb_table.table_tid]["values"][-1:-6:-1]:
-            year_split = year[0:4]
-            print(year_split)
+        for year in ssb_table.variables["variables"][ssb_table.table_tid]["values"][-1:iterations:-1]:
             new_meta_var = copy.deepcopy(ssb_table.variables["variables"])
             new_meta_regions = []
             for region in ssb_table.variables["variables"][ssb_table.table_region]["values"]:                
@@ -470,8 +474,7 @@ def meta_filter():
                 elif region in klass.filtered_regions.keys():
                     valid_from = int(klass.filtered_regions[region]["validFrom"])
                     valid_to = int(klass.filtered_regions[region]["validTo"])
-                    if int(year[0:3]) in range(valid_from, valid_to):
-                        print(year)
+                    if int(year[0:4]) in range(valid_from, valid_to):
                         if (ssb_table.table_size * (len(new_meta_regions) + 1)) < ssb_table.ssb_max_row_query:
                             new_meta_regions.append(region)
                         else:
@@ -507,7 +510,7 @@ def post_query():
     """
 
     dataframes = []
-    meta_data = meta_filter()
+    meta_data = meta_filter(calc_iterations())
 
     for variables in meta_data:
         query = build_query(variables)
@@ -520,7 +523,7 @@ def post_query():
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
 
-ssb_table = SSBTable("01222")
+ssb_table = SSBTable()
 tid = []
 for var in ssb_table.variables["variables"]:
     if var["code"] == "Tid":
