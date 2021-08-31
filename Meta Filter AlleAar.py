@@ -11,7 +11,7 @@ from datetime import datetime
 
 class SSBTable:
     """ A class used to get metadata from ssb.no, process them and keep track of variables.
-    
+
     ...
 
     Attributes:
@@ -19,7 +19,7 @@ class SSBTable:
     table_id : str
         Table number thats used to query against correct ssb table.
     metadata_filter : list
-        A list thats set to None by default, unless a filter has been passed along. 
+        A list thats set to None by default, unless a filter has been passed along.
         This filter defines what data we will query with, if its empty we will query for everything.
 
     Methods:
@@ -34,7 +34,7 @@ class SSBTable:
     filter_as_dict
         ...
     find_table_dimensions():
-        Calculates the size of the table except for 
+        Calculates the size of the table except for
         Tid and Region since we will be iterating on those.
     """
 
@@ -45,9 +45,9 @@ class SSBTable:
         table_id : str
             Table number thats used to query against correct ssb table.
         metadata_filter : list/None
-            A list thats set to None by default, unless a filter has been passed along. 
+            A list thats set to None by default, unless a filter has been passed along.
             This filter defines what data we will query with, if its empty we will query for everything.
-        
+
         Attributes:
         -----------
         variables : list
@@ -103,7 +103,8 @@ class SSBTable:
         filtered_variables = []
         ssb_table_metadata = requests.get(self.metadata_url).json()
         if (inclusion_variables != None) or (exclusion_variables != None):
-            filtered_variables = self.filter_json_metadata(ssb_table_metadata, self.inclusion_variables, self.exclusion_variables)
+            filtered_variables = self.filter_json_metadata(ssb_table_metadata, self.inclusion_variables,
+                                                           self.exclusion_variables)
         else:
             filtered_variables = ssb_table_metadata
         return filtered_variables
@@ -119,7 +120,7 @@ class SSBTable:
             A dict of the filter string provided by filters_as_dict to include
         filter_dict_exc : dict
             A dict of the filter string provided by filters_as_dict to exclude
-        
+
         Returns:
         --------
         json_metadata : dict
@@ -142,12 +143,12 @@ class SSBTable:
                             print(value, "finnes ikke i metadata, har blitt fjernet fra spørringen.")
                 json_metadata["variables"][idx]["values"] = filter_dict_inc[var["code"]]
                 json_metadata["variables"][idx]["valueTexts"] = value_texts
-        
+
         for idx, var in enumerate(json_metadata["variables"]):
             if var["code"] in filter_dict_exc:
                 for value in filter_dict_exc[var["code"]]:
                     json_metadata["variables"][idx]["values"].remove(value)
-                
+
         return json_metadata
 
     def filters_as_dict(self, filter_string):
@@ -157,7 +158,7 @@ class SSBTable:
         -----------
         filter_string : str
             A string with filter tags.
-        
+
         Returns:
         --------
         filters : dict
@@ -172,7 +173,6 @@ class SSBTable:
             if re.search(r"\w+=\w+", var):
                 filter_args_inc_split.append(var)
 
-        
         filter_args_exc = []
         for var in filter_args_exc_split:
             split = re.split(r"!=", var)
@@ -183,10 +183,8 @@ class SSBTable:
             split = re.split(r"=", var)
             filter_args_inc.extend(split)
 
-        
         filters_inc = {}
         filters_exc = {}
-        
 
         if filter_args_exc:
             for idx, meta_filter in enumerate(filter_args_exc):
@@ -233,16 +231,18 @@ class SSBTable:
                 table_tid_name = "år"
                 table_tid = v_idx
             elif var["code"] == "Tid":
-                raise Exception("Tid er noe annet enn år, kvartal eller måned. Verdien på navnet er x.".format(var["text"]))
+                raise Exception(
+                    "Tid er noe annet enn år, kvartal eller måned. Verdien på navnet er x.".format(var["text"]))
             else:
                 table_size *= len(var["values"])
         return table_region, table_tid_name, table_tid, table_size, table_total_size
+
 
 class RegionKLASS:
     """ A class used to get classification list from SSB to keep track of which regions are valid within the last five years
 
     This class is primarely used to get a list of region codes and their validity within the last five years.
-    Its used to get that list from various classification lists, append them all together, filter out equal ones 
+    Its used to get that list from various classification lists, append them all together, filter out equal ones
     and merge the ones who only has had a name change and not region code change.
 
     Attributes:
@@ -268,7 +268,7 @@ class RegionKLASS:
         -----------
         klass_id : list
             List of classificationcode we are using to get our complete list of region codes.
-        
+
         Attributes:
         -----------
         klass_id : list
@@ -282,7 +282,7 @@ class RegionKLASS:
         filtered_klass_variables : list
             Pruned and filtered list of classifications
         filtered_regions : dict
-            Filtered and merged regions. 
+            Filtered and merged regions.
         """
         tid = ""
         max_tid = max(tid_list)[0:4]
@@ -310,14 +310,14 @@ class RegionKLASS:
             The concatenated url
         """
         url = "http://data.ssb.no/api/klass/v1/classifications/" + i + "/codes?from=" + \
-            str(self.from_date) + "-01-01&to=2059-01-01&includeFuture=true"
+              str(self.from_date) + "-01-01&to=2059-01-01&includeFuture=true"
         return url
 
     def get_klass_variables(self):
         """ Does a JSON get request for the classification ID provided and appends it to a list
 
         Set a headers dict first, this is so that we get a JSON back. Standard return from SSB is XML.
-        Then we loop over the klass_id list and do a get request for each klass_id provided and append them to 
+        Then we loop over the klass_id list and do a get request for each klass_id provided and append them to
         a list.
 
         Returns:
@@ -339,7 +339,7 @@ class RegionKLASS:
     def filter_klass_variables(self):
         """ Prunes the classification code region list to only include code, validfrom and validto dates.
 
-        Runs through the klass_variables list and loads them as a JSON object. It then runs through the 
+        Runs through the klass_variables list and loads them as a JSON object. It then runs through the
         JSON object and prunes away everything we dont need so that we only have region code, validfrom and validto.
         This might be an unnecessary step, but it doesnt take much time and is done only once per table.
 
@@ -368,7 +368,7 @@ class RegionKLASS:
     def filter_regions(self):
         """ Filters equal codes, merges ones with name change and not region code change.
 
-        In this method we go through the filtered_klass_variables and merge regions that has only changed name, 
+        In this method we go through the filtered_klass_variables and merge regions that has only changed name,
         we also filter out regions that are equal.
 
         Returns:
@@ -382,13 +382,14 @@ class RegionKLASS:
                 a = filtered_regions_klass[regions["code"]]
                 if regions["validFrom"] < filtered_regions_klass[regions["code"]]["validFrom"]:
                     filtered_regions_klass[regions["code"]
-                                           ]["validFrom"] = regions["validFrom"]
+                    ]["validFrom"] = regions["validFrom"]
                 elif regions["validTo"] > filtered_regions_klass[regions["code"]]["validTo"]:
                     filtered_regions_klass[regions["code"]
-                                           ]["validTo"] = regions["validTo"]
+                    ]["validTo"] = regions["validTo"]
             except KeyError:
                 filtered_regions_klass[regions["code"]] = regions
         return filtered_regions_klass
+
 
 def build_query(variables, _filter="item"):
     """ A function to build a standard query for the SSB API.
@@ -396,7 +397,7 @@ def build_query(variables, _filter="item"):
     We set up a standard query as a dict and an empty query list.
     Then it loops over the variables parameter, which is a list of the metadata
     that has been filtered for the regions that are invalid within the last five years.
-    It ignores the other values, except for the code, filter and values from the metadata 
+    It ignores the other values, except for the code, filter and values from the metadata
     as SSB doesnt use those when querying.
     At the end it appends it query list in the main query dict and returns it.
 
@@ -435,6 +436,7 @@ def build_query(variables, _filter="item"):
         query["query"].append(query_details)
     return query
 
+
 def calc_iterations():
     iterations = 0
     if ssb_table.table_tid_name == "år":
@@ -443,32 +445,33 @@ def calc_iterations():
         iterations = -61
     elif ssb_table.table_tid_name == "kvartal":
         iterations = -21
-    
+
     return iterations
+
 
 def meta_filter(iterations):
     """ A function that filters away the regions that are invalid for the past five years.
 
     We run a double for loop, where the first one iterates on year and the second one goes through regions.
-    Its done this way becaue of the way JSON-Stat files are built up, if we dont do a filter and query for each year 
-    separately we will end up getting values for regions that are invalid for that year (In SSBs case they 
-    are returned as the number 0). For each region we check it against our classification list to check if the 
-    region code we are on is valid for the current year we are iterating over. If not, it excludes it from the filter. 
-    We also constantly check if the next region added is going to make us surpass 800k rows on a query, is so, it appends 
-    the current list to metadata_filter and starts building up a new list from where it left off. If it never reaches 800k 
+    Its done this way becaue of the way JSON-Stat files are built up, if we dont do a filter and query for each year
+    separately we will end up getting values for regions that are invalid for that year (In SSBs case they
+    are returned as the number 0). For each region we check it against our classification list to check if the
+    region code we are on is valid for the current year we are iterating over. If not, it excludes it from the filter.
+    We also constantly check if the next region added is going to make us surpass 800k rows on a query, is so, it appends
+    the current list to metadata_filter and starts building up a new list from where it left off. If it never reaches 800k
     per year, it will append the list to metadata_filter when the region loop is done.
 
     Returns:
     --------
     metadata_filter : list
-        A list of the metadata_variables that has been filtered for non valid regions for the past five years. 
+        A list of the metadata_variables that has been filtered for non valid regions for the past five years.
     """
     metadata_filter = []
     if ssb_table.table_region != None:
         for year in ssb_table.variables["variables"][ssb_table.table_tid]["values"][-1:iterations:-1]:
             new_meta_var = copy.deepcopy(ssb_table.variables["variables"])
             new_meta_regions = []
-            for region in ssb_table.variables["variables"][ssb_table.table_region]["values"]:                
+            for region in ssb_table.variables["variables"][ssb_table.table_region]["values"]:
                 if region in {"0", "EAK", "EAKUO"}:
                     new_meta_regions.append(region)
                 elif region in klass.filtered_regions.keys():
@@ -492,15 +495,16 @@ def meta_filter(iterations):
             metadata_filter.append(ssb_table.variables["variables"])
     return metadata_filter
 
+
 def post_query():
     """ A function to do a post query on the SSB API.
 
-    This function does a post query on the SSB API, following the SSB API Documentation, by 
+    This function does a post query on the SSB API, following the SSB API Documentation, by
     doing a post request with the query we have built up, we get a JSON stat file back with the result.
-    First we run meta_filter() once to get the filtered metadata variables, then for each dict in the list 
-    we run the build_query() function and post that query to the SSB API. Which after running that query 
-    returns a JSON-Stat file back with the results. We then run that JSON-Stat through pyjstat which converts 
-    and structures that file to a pandas DataFrame which gets appended to dataframes list. Once the for loop 
+    First we run meta_filter() once to get the filtered metadata variables, then for each dict in the list
+    we run the build_query() function and post that query to the SSB API. Which after running that query
+    returns a JSON-Stat file back with the results. We then run that JSON-Stat through pyjstat which converts
+    and structures that file to a pandas DataFrame which gets appended to dataframes list. Once the for loop
     has finished we run a pandas concat on the dataframes list to convert to one single DF.
 
     Returns:
@@ -523,11 +527,11 @@ def post_query():
     big_df = pd.concat(dataframes, ignore_index=True)
     return big_df
 
-ssb_table = SSBTable()
+
+ssb_table = SSBTable(TabellNummer, Filter)
 tid = []
 for var in ssb_table.variables["variables"]:
     if var["code"] == "Tid":
         tid = var["values"]
 klass = RegionKLASS(["131", "104", "214", "231"], tid)
 r = post_query()
-print(r)
